@@ -1,35 +1,51 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { supabase } from "./supabase";
+
+import Login from "./componentes/login";
+import Register from "./componentes/register";
+import Home from "./componentes/home";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [usuario, setUsuario] = useState(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    // Verificar sesión actual
+    async function verificarSesion() {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUsuario(session?.user || null);
+      setCargando(false);
+    }
+
+    verificarSesion();
+
+    // Escuchar cambios en la sesión
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUsuario(session?.user || null);
+    });
+
+    // Cleanup
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  if (cargando) return <p style={{ textAlign: "center", marginTop: "50px" }}>Cargando...</p>;
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Router>
+      <Routes>
+        {/* Ruta privada: home */}
+        <Route path="/" element={usuario ? <Home /> : <Navigate to="/login" />} />
+        
+        {/* Rutas de autenticación */}
+        <Route path="/login" element={!usuario ? <Login /> : <Navigate to="/" />} />
+        <Route path="/registro" element={!usuario ? <Register /> : <Navigate to="/" />} />
+
+        {/* Ruta catch-all: si escribe algo desconocido */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+export default App;
