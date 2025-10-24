@@ -7,26 +7,42 @@ function Register() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          fullName,
-          username,
-        },
-      },
-    });
+    try {
+      // 🔹 1. Crear cuenta en Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
-    if (error) {
-      alert("❌ Error al registrar usuario");
-    } else {
-      alert("✅ Cuenta creada, revisa tu correo para confirmar");
+      if (error) throw error;
+
+      // 🔹 2. Si se creó el usuario correctamente, insertar en tabla "usuarios"
+      const user = data.user;
+      if (user) {
+        const { error: insertError } = await supabase.from("usuarios").insert([
+          {
+            id: user.id,
+            full_name: fullName,
+            username: username,
+          },
+        ]);
+
+        if (insertError) throw insertError;
+      }
+
+      alert("✅ Cuenta creada correctamente. Revisa tu correo para confirmar tu registro.");
       window.location.href = "/login";
+    } catch (error) {
+      console.error("Error en el registro:", error);
+      alert("❌ Error al registrar usuario. Inténtalo de nuevo.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,7 +95,9 @@ function Register() {
             />
           </div>
 
-          <button type="submit" className="btn-submit">Registrarme</button>
+          <button type="submit" className="btn-submit" disabled={loading}>
+            {loading ? "Creando cuenta..." : "Registrarme"}
+          </button>
         </form>
 
         <p className="switch-text">

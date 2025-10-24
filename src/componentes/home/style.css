@@ -42,6 +42,14 @@ body {
   color: #007BFF;
 }
 
+/* Contenedor de botones del menú (contacto + cerrar sesión) */
+.menu-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Botón de contacto */
 .btn-contacto {
   background-color: #007BFF;
   color: white;
@@ -53,6 +61,24 @@ body {
 
 .btn-contacto:hover {
   background-color: #0056b3;
+}
+
+/* Botón de cerrar sesión */
+.btn-logout {
+  background-color: #ff4b4b;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s, transform 0.2s;
+}
+
+.btn-logout:hover {
+  background-color: #e23c3c;
+  transform: scale(1.05);
 }
 
 /*Estilos del hero*/
