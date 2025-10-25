@@ -15,6 +15,7 @@ function Closet() {
   });
   const [outfits, setOutfits] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [dialogText, setDialogText] = useState("¿Qué vamos a vestir hoy?");
   const scrollRef = useRef(null);
 
   // 🔹 Obtener usuario y prendas
@@ -83,6 +84,14 @@ function Closet() {
       }
     });
     setSeleccionadas(nuevoLook);
+
+    // 🔹 Actualizar barra de diálogo con la sugerencia
+    const seleccionadasTexto = Object.values(nuevoLook)
+      .filter(Boolean)
+      .map((p) => p.nombre)
+      .join(" + ");
+
+    setDialogText(`Mi sugerencia es: ${seleccionadasTexto}`);
   };
 
   // 🔹 Guardar look
@@ -136,6 +145,13 @@ function Closet() {
       nuevoSeleccionadas[prenda.categoria] = prenda;
     });
     setSeleccionadas(nuevoSeleccionadas);
+
+    // Actualizar diálogo con las prendas del outfit cargado
+    const seleccionadasTexto = Object.values(nuevoSeleccionadas)
+      .filter(Boolean)
+      .map((p) => p.nombre)
+      .join(" + ");
+    setDialogText(seleccionadasTexto ? `Mi sugerencia es: ${seleccionadasTexto}` : "¿Qué vamos a vestir hoy?");
   };
 
   if (cargando) return <p className="loading-text">Cargando tu closet...</p>;
@@ -162,6 +178,11 @@ function Closet() {
               </div>
             )
           )}
+        </div>
+
+        {/* 🔹 Barra de diálogo */}
+        <div className="dialog-bar">
+          <p>{dialogText}</p>
         </div>
 
         <div className="buttons-container">
