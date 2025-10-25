@@ -1,92 +1,232 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../supabase";
 import "./style.css";
 
 function Closet() {
+  const [user, setUser] = useState(null);
   const [prendas, setPrendas] = useState([]);
-  const [avatarPrendas, setAvatarPrendas] = useState({});
-  const [categoria, setCategoria] = useState("Camisas");
-  const [outfitsGuardados, setOutfitsGuardados] = useState([]);
-  const avatarDummy = "https://github.com/Daniel-Vanegas01/Proyecto-final/blob/main/dummy_m.png?raw=true";
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("camisa");
+  const [seleccionadas, setSeleccionadas] = useState({
+    camisa: null,
+    pantalon: null,
+    calzado: null,
+    gorro: null,
+    accesorio: null,
+  });
+  const [outfits, setOutfits] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const scrollRef = useRef(null);
 
-  const categorias = ["Gorros", "Camisas", "Pantalones", "Zapatos", "Trajes", "Accesorios"];
-  const ordenCapas = ["Pantalones", "Zapatos", "Camisas", "Accesorios", "Gorros", "Trajes"];
-
+  // 🔹 Obtener usuario y prendas
   useEffect(() => {
-    async function obtenerPrendas() {
-      const { data, error } = await supabase.from("prendas").select("*");
-      if (!error) setPrendas(data);
-    }
-    obtenerPrendas();
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
+        await cargarPrendas(user.id);
+        await cargarOutfits(user.id);
+      }
+      setCargando(false);
+    };
+    fetchData();
   }, []);
 
-  const seleccionarPrenda = (prenda) => {
-    setAvatarPrendas(prev => ({ ...prev, [prenda.categoria]: prenda.imagen }));
+  // 🔹 Cargar prendas del usuario
+  const cargarPrendas = async (userId) => {
+    const { data, error } = await supabase
+      .from("prendas")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) console.error("Error al cargar prendas:", error);
+    else setPrendas(data);
   };
 
-  const generarCombinacion = () => {
-    const nuevaCombinacion = {};
-    categorias.forEach(cat => {
-      const prendasCat = prendas.filter(p => p.categoria === cat);
+  // 🔹 Cargar outfits guardados
+  const cargarOutfits = async (userId) => {
+    const { data, error } = await supabase
+      .from("outfits")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) console.error("Error al cargar outfits:", error);
+    else setOutfits(data);
+  };
+
+  // 🔹 Seleccionar prenda
+  const handleSelectPrenda = (prenda) => {
+    setSeleccionadas((prev) => ({
+      ...prev,
+      [prenda.categoria]: prenda,
+    }));
+  };
+
+  // 🔹 Deseleccionar prenda
+  const handleDeselectPrenda = (categoria) => {
+    setSeleccionadas((prev) => ({
+      ...prev,
+      [categoria]: null,
+    }));
+  };
+
+  // 🔹 Generar look aleatorio
+  const generarLook = () => {
+    const categorias = ["camisa", "pantalon", "calzado"];
+    const nuevoLook = { ...seleccionadas };
+    categorias.forEach((cat) => {
+      const prendasCat = prendas.filter((p) => p.categoria === cat);
       if (prendasCat.length > 0) {
-        const aleatoria = prendasCat[Math.floor(Math.random() * prendasCat.length)];
-        nuevaCombinacion[cat] = aleatoria.imagen;
+        const randomIndex = Math.floor(Math.random() * prendasCat.length);
+        nuevoLook[cat] = prendasCat[randomIndex];
       }
     });
-    setAvatarPrendas(nuevaCombinacion);
+    setSeleccionadas(nuevoLook);
   };
 
-  const guardarOutfit = () => {
-    if (Object.keys(avatarPrendas).length === 0) return alert("Selecciona prendas primero");
-    setOutfitsGuardados(prev => [...prev, avatarPrendas]);
-    alert("Outfit guardado!");
+  // 🔹 Guardar look
+  const guardarLook = async () => {
+    if (!user) return alert("❌ No hay usuario autenticado");
+
+    const prendasSeleccionadas = Object.values(seleccionadas).filter(Boolean);
+
+    if (prendasSeleccionadas.length === 0)
+      return alert("👕 No hay prendas seleccionadas para guardar.");
+
+    try {
+      const { error } = await supabase.from("outfits").insert([
+        {
+          user_id: user.id,
+          nombre: `Outfit ${outfits.length + 1}`,
+          combinacion: prendasSeleccionadas,
+        },
+      ]);
+
+      if (error) throw error;
+
+      alert("✅ Outfit guardado exitosamente");
+      await cargarOutfits(user.id); // recargar lista de outfits
+    } catch (error) {
+      console.error(error);
+      alert("❌ Error al guardar el outfit");
+    }
   };
+
+  // 🔹 Scroll catálogo
+  const scroll = (direction) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({
+        left: direction === "right" ? 200 : -200,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // 🔹 Cargar outfit seleccionado en prendas seleccionadas
+  const cargarOutfitSeleccionado = (outfit) => {
+    const nuevoSeleccionadas = {
+      camisa: null,
+      pantalon: null,
+      calzado: null,
+      gorro: null,
+      accesorio: null,
+    };
+    outfit.combinacion.forEach((prenda) => {
+      nuevoSeleccionadas[prenda.categoria] = prenda;
+    });
+    setSeleccionadas(nuevoSeleccionadas);
+  };
+
+  if (cargando) return <p className="loading-text">Cargando tu closet...</p>;
 
   return (
-    <div className="closet-container">
-      <div className="avatar-section">
-        <div className="avatar-cuadro">
-          <img src={avatarDummy} alt="Avatar" className="avatar-base" />
-          {ordenCapas.map(cat =>
-            avatarPrendas[cat] ? (
-              <img key={cat} src={avatarPrendas[cat]} alt={cat} className={`avatar-${cat.toLowerCase()}`} />
-            ) : null
+    <div className="closet-wrapper">
+      {/* 🟢 Prendas Seleccionadas */}
+      <div className="selected-prendas-container">
+        <h2>Prendas Seleccionadas</h2>
+        <div className="seleccionadas-grid">
+          {Object.entries(seleccionadas).map(([cat, prenda]) =>
+            prenda ? (
+              <div
+                key={cat}
+                className="prenda-seleccionada"
+                onClick={() => handleDeselectPrenda(cat)}
+              >
+                <img src={prenda.imagen_url} alt={prenda.nombre} />
+                <p>{prenda.nombre}</p>
+              </div>
+            ) : (
+              <div key={cat} className="prenda-vacia">
+                <p>{cat.toUpperCase()}</p>
+              </div>
+            )
           )}
         </div>
-        <div className="botones-avatar">
-          <button onClick={generarCombinacion}>🎲 Generar combinación</button>
-          <button onClick={guardarOutfit}>💾 Guardar outfit</button>
-          <button onClick={() => alert("Aquí se mostrarían los avatares guardados")}>👗 Avatares guardados</button>
+
+        <div className="buttons-container">
+          <button className="btn-look" onClick={generarLook}>🎲 Generar Look</button>
+          <button className="btn-save" onClick={guardarLook}>💾 Guardar Outfit</button>
         </div>
       </div>
 
-      <div className="catalogo-section">
-        <h3>Catálogo: {categoria}</h3>
-        <div className="categorias-scroll">
-          {categorias.map(cat => (
-            <button
-              key={cat}
-              className={cat === categoria ? "cat-activa" : ""}
-              onClick={() => setCategoria(cat)}
-            >
-              {cat}
-            </button>
-          ))}
+      {/* 🟢 Catálogo */}
+      <div className="catalogo-container">
+        <h2>Tu Catálogo</h2>
+        <div className="categorias-wrapper">
+          <button className="scroll-btn left" onClick={() => scroll("left")}>‹</button>
+          <div className="categorias-scroll" ref={scrollRef}>
+            {["gorro", "camisa", "pantalon", "calzado", "traje", "vestido", "accesorio"].map((cat) => (
+              <button
+                key={cat}
+                className={`cat-btn ${categoriaSeleccionada === cat ? "active" : ""}`}
+                onClick={() => setCategoriaSeleccionada(cat)}
+              >
+                {cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button className="scroll-btn right" onClick={() => scroll("right")}>›</button>
         </div>
 
-        <div className="prendas-scroll">
-          {prendas
-            .filter(p => p.categoria === categoria)
-            .map(prenda => (
-              <img
-                key={prenda.id}
-                src={prenda.imagen}
-                alt={prenda.nombre}
-                className="prenda-item"
-                onClick={() => seleccionarPrenda(prenda)}
-              />
-            ))}
+        <div className="prendas-grid">
+          {prendas.filter((p) => p.categoria === categoriaSeleccionada).length > 0 ? (
+            prendas
+              .filter((p) => p.categoria === categoriaSeleccionada)
+              .map((prenda) => (
+                <div
+                  key={prenda.id}
+                  className="prenda-item"
+                  onClick={() => handleSelectPrenda(prenda)}
+                >
+                  <img src={prenda.imagen_url} alt={prenda.nombre} />
+                  <p>{prenda.nombre}</p>
+                </div>
+              ))
+          ) : (
+            <p className="sin-prendas">No tienes prendas en esta categoría.</p>
+          )}
         </div>
+      </div>
+
+      {/* 🟢 Outfits Guardados (Lista) */}
+      <div className="outfits-container">
+        <h2>Outfits Guardados</h2>
+        {outfits.length > 0 ? (
+          <ul className="outfits-list">
+            {outfits.map((outfit, index) => (
+              <li
+                key={outfit.id}
+                className="outfit-list-item"
+                onClick={() => cargarOutfitSeleccionado(outfit)}
+              >
+                Outfit {index + 1}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No tienes outfits guardados aún.</p>
+        )}
       </div>
     </div>
   );
